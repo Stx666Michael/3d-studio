@@ -10,9 +10,13 @@ import {Renderer} from './renderer.mjs';
 import {
   finite,
   LIMITS,
-  validateAnimation,
-  validateRecipe
+  validateAnimation
 } from './contracts.mjs';
+import {
+  MAX_PROJECT_FILE_BYTES,
+  parseProject,
+  serializeProject
+} from './project.mjs';
 
 const $ = id => document.getElementById(id);
 const AXES = ['x', 'y', 'z'];
@@ -23,12 +27,12 @@ const EDITABLE_CLIP_CONTROLS = [
   'duration',
   'loop'
 ];
-const MAX_PROJECT_GLB_LENGTH = Math.ceil((LIMITS.upload * 4) / 3);
-const MAX_PROJECT_FILE_BYTES = MAX_PROJECT_GLB_LENGTH + 1024 * 1024;
-const STARTER_URL = new URL('./assets/lilac-animated.glb', import.meta.url);
+const STARTER_URL = new URL('./assets/starter-owl.glb', import.meta.url);
 
 let renderer;
 let doc;
+let scenes = [];
+let activeSceneId = '';
 let selected = null;
 let clipId = '';
 let time = 0;
@@ -43,12 +47,112 @@ const undo = [];
 const redo = [];
 
 const active = () => doc?.clips.find(clip => clip.id === clipId) || null;
+const activeScene = () => scenes.find(scene => scene.id === activeSceneId);
 const node = () => doc?.nodes.find(sceneNode => sceneNode.id === selected);
 const copy = documentData => ({
   ...documentData,
   nodes: structuredClone(documentData.nodes),
   clips: structuredClone(documentData.clips)
 });
+
+function createEmptyDocument(name = 'Empty workspace') {
+  return {
+    name,
+    nodes: [],
+    meshes: [],
+    clips: []
+  };
+}
+
+function createScene(documentData, id = crypto.randomUUID()) {
+  return {id, document: documentData};
+}
+
+function updateSceneControls() {
+  $('sceneSelect').replaceChildren();
+  for (const scene of scenes) {
+    $('sceneSelect').add(new Option(scene.document.name, scene.id));
+  }
+  $('sceneSelect').value = activeSceneId;
+  $('deleteScene').disabled = scenes.length <= 1;
+  $('duplicateScene').disabled = !doc;
+}
+
+function activateScene(sceneId) {
+  const scene = scenes.find(item => item.id === sceneId);
+  if (!scene) {
+    throw Error('The selected scene no longer exists.');
+  }
+
+  pending = null;
+  $('previewDialog').close();
+  activeSceneId = scene.id;
+  undo.length = 0;
+  redo.length = 0;
+  setDoc(scene.document, {history: false});
+}
+
+function addScene(documentData, {select = true, id} = {}) {
+  if (scenes.length >= LIMITS.scenes) {
+    throw Error(`A project can contain at most ${LIMITS.scenes} scenes.`);
+  }
+
+  const scene = createScene(documentData, id);
+  scenes.push(scene);
+  if (select) {
+    activateScene(scene.id);
+  } else {
+    update();
+  }
+  return scene;
+}
+
+function loadProject(nextProject) {
+  if (!nextProject.scenes.length) {
+    throw Error('A project must contain at least one scene.');
+  }
+
+  scenes = nextProject.scenes;
+  activeSceneId = nextProject.activeSceneId;
+  undo.length = 0;
+  redo.length = 0;
+  activateScene(activeSceneId);
+}
+
+function duplicateScene() {
+  if (!doc) {
+    return;
+  }
+
+  const duplicate = copy(doc);
+  duplicate.name = `${doc.name} copy`;
+  addScene(duplicate);
+  status(`Duplicated scene: ${duplicate.name}.`);
+}
+
+function createNewScene() {
+  const name = `Scene ${scenes.length + 1}`;
+  addScene(createEmptyDocument(name));
+  status(`Created scene: ${name}.`);
+}
+
+function deleteScene() {
+  if (scenes.length <= 1) {
+    throw Error('Keep at least one scene in the project.');
+  }
+
+  const scene = activeScene();
+  if (!scene || !window.confirm(`Delete "${scene.document.name}"?`)) {
+    return;
+  }
+
+  const index = scenes.indexOf(scene);
+  scenes.splice(index, 1);
+  const nextScene = scenes[Math.min(index, scenes.length - 1)];
+  activeSceneId = nextScene.id;
+  activateScene(activeSceneId);
+  status(`Deleted scene: ${scene.document.name}.`);
+}
 
 function status(message, error = false) {
   $('status').textContent = message;
@@ -84,19 +188,22 @@ function commit(callback, {reload = false} = {}) {
 }
 
 function setDoc(documentData, {history = true} = {}) {
+  const scene = activeScene();
+  if (!scene) {
+    throw Error('No active scene is available.');
+  }
+
   if (doc && history) {
     undo.push(copy(doc));
   }
 
+  scene.document = documentData;
   doc = documentData;
   redo.length = 0;
   version++;
   playing = false;
   time = 0;
-  selected =
-    doc.nodes.find(sceneNode => sceneNode.name === 'Lilac_Root')?.id ||
-    doc.nodes[0]?.id ||
-    null;
+  selected = doc.nodes.find(sceneNode => !sceneNode.parent)?.id || null;
   clipId = doc.clips[0]?.id || '';
   renderer.setDocument(doc);
   update();
@@ -252,6 +359,7 @@ function update() {
   }
 
   $('projectName').textContent = doc.name;
+  updateSceneControls();
   $('clips').replaceChildren(new Option('Base pose / no clip', ''));
   for (const clip of doc.clips) {
     $('clips').add(new Option(clip.name, clip.id));
@@ -340,6 +448,7 @@ function undoEdit() {
 
   redo.push(copy(doc));
   doc = undo.pop();
+  activeScene().document = doc;
   version++;
   clipId = doc.clips.some(clip => clip.id === clipId)
     ? clipId
@@ -361,6 +470,7 @@ function redoEdit() {
 
   undo.push(copy(doc));
   doc = redo.pop();
+  activeScene().document = doc;
   version++;
   time = 0;
   playing = false;
@@ -479,63 +589,43 @@ async function importFile() {
   }
 
   try {
-    let documentData;
     if (file.name.endsWith('.glb')) {
-      documentData = importGLB(await file.arrayBuffer());
-    } else if (file.name.endsWith('.json')) {
+      const documentData = importGLB(await file.arrayBuffer());
+      documentData.name = file.name.replace(/\.glb$/, '');
+      addScene(documentData);
+      status(
+        `Imported ${file.name} as a new scene. Unsupported rigs/textures are rejected rather than silently removed.`
+      );
+    } else if (file.name.endsWith('.3ds')) {
       if (file.size > MAX_PROJECT_FILE_BYTES) {
         throw Error('Project file too large.');
       }
 
-      const project = JSON.parse(await file.text());
-      if (
-        project.format !== 'lilac-project' ||
-        project.version !== 1 ||
-        typeof project.glb !== 'string' ||
-        project.glb.length > MAX_PROJECT_GLB_LENGTH
-      ) {
-        throw Error('Not a supported 3D Studio project.');
-      }
-
-      const bytes = Uint8Array.from(atob(project.glb), character =>
-        character.charCodeAt(0)
+      loadProject(parseProject(await file.text()));
+      status(
+        `Imported ${file.name} with ${scenes.length} scene${
+          scenes.length === 1 ? '' : 's'
+        }.`
       );
-      documentData = importGLB(bytes.buffer);
-      if (project.recipe) {
-        documentData.recipe = validateRecipe(project.recipe);
-      }
     } else {
-      throw Error('Use .glb or a saved .3dstudio.json project.');
+      throw Error('Use .glb or a saved .3ds project.');
     }
-
-    documentData.name = file.name.replace(/\.(glb|lilac\.json|json)$/, '');
-    setDoc(documentData);
-    status(
-      `Imported ${file.name}. Unsupported rigs/textures are rejected rather than silently removed.`
-    );
   } finally {
     $('file').value = '';
   }
 }
 
 function saveProject() {
-  const bytes = new Uint8Array(exportGLB(doc));
-  const parts = [];
-  for (let index = 0; index < bytes.length; index += 32768) {
-    parts.push(String.fromCharCode(...bytes.subarray(index, index + 32768)));
-  }
-
   download(
-    JSON.stringify({
-      format: 'lilac-project',
-      version: 1,
-      glb: btoa(parts.join('')),
-      recipe: doc.recipe || null
-    }),
-    'studio.3dstudio.json',
+    serializeProject(scenes, activeSceneId),
+    'my_project.3ds',
     'application/json'
   );
-  status('Project downloaded. Keep this file to resume later; this MVP has no cloud storage.');
+  status(
+    `Project downloaded with ${scenes.length} scene${
+      scenes.length === 1 ? '' : 's'
+    }. Keep this file to resume later; this MVP has no cloud storage.`
+  );
 }
 
 function buildManifest() {
@@ -736,8 +826,80 @@ function frame(now) {
   renderer.render(poses(view, viewClip, renderTime), selected);
 }
 
+function updateExportAnimationOptions() {
+  const scene = scenes.find(item => item.id === $('exportScene').value) ||
+    activeScene();
+  $('exportAnimation').replaceChildren(
+    new Option('Base pose / no animation', ''),
+    new Option('All animations', '__all__')
+  );
+
+  if (!scene) {
+    return;
+  }
+
+  for (const clip of scene.document.clips) {
+    $('exportAnimation').add(new Option(clip.name, clip.id));
+  }
+
+  const preferred =
+    scene.id === activeSceneId && scene.document.clips.some(item => item.id === clipId)
+      ? clipId
+      : '__all__';
+  $('exportAnimation').value = preferred;
+}
+
+function openExportDialog() {
+  $('exportScene').replaceChildren();
+  for (const scene of scenes) {
+    $('exportScene').add(new Option(scene.document.name, scene.id));
+  }
+  $('exportScene').value = activeSceneId;
+  updateExportAnimationOptions();
+  $('exportDialog').showModal();
+}
+
+function safeExportName(name) {
+  return (
+    name
+      .trim()
+      .replace(/[^a-z0-9._-]+/gi, '-')
+      .replace(/^-+|-+$/g, '') || 'scene'
+  );
+}
+
+async function exportSelected(event) {
+  event.preventDefault();
+  const scene = scenes.find(item => item.id === $('exportScene').value);
+  if (!scene) {
+    throw Error('Choose a scene to export.');
+  }
+
+  const animationId = $('exportAnimation').value;
+  download(
+    exportGLB(scene.document, {animationId}),
+    `${safeExportName(scene.document.name)}.glb`,
+    'model/gltf-binary'
+  );
+  $('exportDialog').close();
+  const animationLabel =
+    animationId === ''
+      ? 'base pose'
+      : animationId === '__all__'
+        ? 'all animations'
+        : scene.document.clips.find(clip => clip.id === animationId)?.name ||
+          'selected animation';
+  status(`Exported ${scene.document.name} with ${animationLabel}.`);
+}
+
 function initializeControls() {
   $('starter').onclick = handle(starter);
+  $('sceneSelect').onchange = handle(() =>
+    activateScene($('sceneSelect').value)
+  );
+  $('newScene').onclick = handle(createNewScene);
+  $('duplicateScene').onclick = handle(duplicateScene);
+  $('deleteScene').onclick = handle(deleteScene);
   $('fit').onclick = () => renderer.fit();
   $('search').oninput = updateTree;
   $('undo').onclick = undoEdit;
@@ -802,10 +964,9 @@ function initializeControls() {
   $('applyTransform').onclick = handle(applyTransform);
   $('import').onclick = () => $('file').click();
   $('file').onchange = handle(importFile);
-  $('export').onclick = handle(() => {
-    download(exportGLB(doc), '3d-studio-model.glb', 'model/gltf-binary');
-    status('Exported GLB with non-empty animation clips.');
-  });
+  $('export').onclick = openExportDialog;
+  $('exportScene').onchange = updateExportAnimationOptions;
+  $('exportForm').onsubmit = handle(exportSelected);
   $('save').onclick = handle(saveProject);
   $('connection').onclick = () => $('connectionDialog').showModal();
 
@@ -881,12 +1042,32 @@ initializeControls();
   try {
     renderer = new Renderer($('canvas'));
     await refreshSession();
-    await starter();
+    const initialScene = createScene(createEmptyDocument());
+    scenes = [initialScene];
+    activeSceneId = initialScene.id;
+    setDoc(initialScene.document, {history: false});
+    $('loading').hidden = true;
+    status(
+      'Empty workspace ready. Load Starter owl, import a model as a new scene, or generate one with Gemini.'
+    );
     requestAnimationFrame(frame);
     window.studioReady = true;
-    window.lilacStudio = {
+    window.studio3d = {
       getDocument: () => doc,
-      getState: () => ({selected, clipId, time, playing, version}),
+      getScenes: () =>
+        scenes.map(scene => ({
+          id: scene.id,
+          name: scene.document.name,
+          document: scene.document
+        })),
+      getState: () => ({
+        selected,
+        clipId,
+        time,
+        playing,
+        version,
+        activeSceneId
+      }),
       setDocument: setDoc,
       exportGLB: () => exportGLB(doc)
     };

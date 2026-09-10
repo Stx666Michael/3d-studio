@@ -1,5 +1,6 @@
 export const LIMITS = {
   nodes: 160,
+  scenes: 32,
   parts: 64,
   tracks: 128,
   keys: 2048,

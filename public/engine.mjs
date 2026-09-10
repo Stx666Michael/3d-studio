@@ -949,7 +949,7 @@ function writeGLBBuffer(gltf, chunks, bufferLength) {
   return output;
 }
 
-export function exportGLB(document) {
+export function exportGLB(document, {animationId} = {}) {
   const chunks = [];
   const bufferViews = [];
   const accessors = [];
@@ -997,7 +997,6 @@ export function exportGLB(document) {
   for (const [index, node] of document.nodes.entries()) {
     const outputNode = {
       name: node.name,
-      extras: {lilacId: node.id}
     };
     if (node.matrix) {
       outputNode.matrix = node.matrix;
@@ -1048,7 +1047,12 @@ export function exportGLB(document) {
     throw Error('Export of multi-primitive nodes is not yet supported.');
   }
 
-  for (const clip of document.clips) {
+  const clips =
+    animationId === undefined || animationId === '__all__'
+      ? document.clips
+      : document.clips.filter(clip => clip.id === animationId);
+
+  for (const clip of clips) {
     if (!clip.tracks.some(track => track.keys.length)) {
       continue;
     }

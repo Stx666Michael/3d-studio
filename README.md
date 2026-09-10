@@ -1,6 +1,6 @@
 # 3D Studio — Gemini MVP 0.1
 
-A local, runnable 3D model and animation editor. Includes the purple owl with nine animation clips.
+A local, runnable 3D model and animation editor. It opens with an empty workspace; use **Starter owl** to load the bundled purple owl with nine animation clips.
 
 ## Start
 Install Node.js 22 or newer. Open a terminal in `3d-studio`, then run:
@@ -31,13 +31,15 @@ Gemini requests are real and may incur charges. Prompts, scene names/transforms 
 - Nine owl clips; play/pause/stop, speed, loop and scrubbing controls.
 - New/duplicate clips; keyframe insertion, replacement and deletion; LINEAR/STEP interpolation.
 - Separate base-pose and keyframe-pose editing; undo/redo (20 transactions).
-- Supported GLB import/export and local `.3dstudio.json` save/reopen.
+- Supported GLB import/export and local `.3ds` project save/reopen with up to 32 independent scenes.
+- New, duplicate, delete and switch project scenes; GLB imports are added as new scenes.
+- Export one selected scene as GLB with the base pose, one animation, or all animations.
 - Responsive light/dark interface. Playback is user-triggered and pauses in hidden tabs.
 - React frontend bootstrapped with Vite HMR and a production build.
 - Three.js renderer with scene hierarchy, standard materials, lighting, selection highlighting and damped orbit controls.
 
 ## Walkthrough
-Select `hover-wave`, press Play, then stop. Select the right wing in Scene, choose Rotation and Keyframe pose, seek to a time, change Z and insert/update a keyframe. Add a Gemini key and try “Make the owl gently tilt and blink while thinking. Loop smoothly over three seconds.” Review the result before applying. Export GLB to move it into another tool.
+Select `hover-wave`, press Play, then stop. Select the right wing in Scene, choose Rotation and Keyframe pose, seek to a time, change Z and insert/update a keyframe. Use **New scene** or **Duplicate** to create another project scene. Add a Gemini key and try “Make the owl gently tilt and blink while thinking. Loop smoothly over three seconds.” Review the result before applying. Use **Export GLB** to choose a scene and whether to include the base pose, one animation, or all animations.
 
 ## MVP scope and limitations
 This is a single-user local development app, not a production hosted service. React and Vite provide the frontend runtime and build workflow; Three.js provides the WebGL renderer. The Node backend remains local-first and does not require a separate database.
@@ -48,7 +50,7 @@ GLB support: self-contained glTF 2.0, solid opaque materials, optional vertex co
 
 No skeletal rigging, texture generation, transform gizmos, curve graph editor, retargeting, interaction-state authoring or cloud persistence yet. Model prompts create a replacement scene after acceptance; targeted AI geometry revision is deferred. New model recipes are limited to 64 primitives.
 
-Keyframes can be inserted/replaced/deleted. To move a key in time, delete its old entry and reinsert its values at the new time. Duration changes do not retime existing keys. Empty clips are omitted from GLB/project export; add a key before saving. Project saves contain embedded GLB plus optional recipe; history is not persisted and canonical IDs are regenerated on import while bindings are preserved.
+Keyframes can be inserted/replaced/deleted. To move a key in time, delete its old entry and reinsert its values at the new time. Duration changes do not retime existing keys. Empty clips are omitted from GLB/project export; add a key before saving. Project saves use the current `3d-studio-project` format and contain one embedded GLB plus optional recipe per scene. Retired project formats are rejected rather than migrated. History is not persisted and canonical IDs are regenerated on import while bindings are preserved.
 
 ## Security
 Server binds to 127.0.0.1 and restricts Host to localhost/loopback. Mutation routes require same-origin and CSRF token. HttpOnly SameSite=Strict session cookies, output validation, size/concurrency/rate limits and an 85-second provider timeout are included. No credentials are passed into generated scene data. Keys in memory remain accessible to someone who controls the host process.
@@ -60,7 +62,7 @@ Do not expose this server directly to the internet. Shared deployment needs auth
 npm test
 npm run build
 ```
-Eleven checks cover bounded recipes, primitive GLB round-trip, import limits, preservation of all nine owl clips, quaternion sampling, rest-pose immutability, animation validation, CSRF/key isolation, mocked Gemini structured-output requests, missing keys and malformed output, plus the React/Vite configuration.
+Fourteen checks cover bounded recipes, primitive GLB round-trip, import limits, preservation of all nine owl clips, selective animation and empty-scene export, multi-scene project round-trips and retired-format rejection, quaternion sampling, rest-pose immutability, animation validation, CSRF/key isolation, retired-cookie rejection, mocked Gemini structured-output requests, missing keys and malformed output, plus the React/Vite configuration.
 
 Browser integration also exercised playback, keyframe editing, undo/redo, secret-input clearing, mocked AI preview/reject/apply/undo and GLB export/reimport, with no JavaScript errors in the passing run. Desktop/mobile screens were inspected.
 
@@ -71,12 +73,14 @@ Browser integration also exercised playback, keyframe editing, undo/redo, secret
 - `vite.config.mjs`: React/Vite development proxy and build configuration.
 - `public/contracts.mjs`: schemas and validation.
 - `public/engine.mjs`: primitives, GLB I/O and animation sampling.
+- `public/project.mjs`: current multi-scene project serialization and validation.
 - `public/app.jsx`: React application entry point.
 - `public/editor-shell.html`: editor markup mounted by React.
 - `public/editor-controller.mjs`: editor history, controls and generation flow.
+- `public/scenes.css`: responsive scene and project controls.
 - `public/renderer.mjs`: Three.js scene renderer.
 - `public/index.html`, `public/style.css`: Vite HTML entry and UI styles.
-- `public/assets/lilac-animated.glb`: starter owl asset retained for compatibility.
+- `public/assets/starter-owl.glb`: bundled starter owl asset.
 - `checks.mjs`: automated verification.
 
 Gemini adapter uses the generateContent endpoint, x-goog-api-key and JSON-schema structured responses. Reference: https://ai.google.dev/gemini-api/docs/structured-output

@@ -13,7 +13,7 @@ import {
 } from './public/contracts.mjs';
 
 const ROOT = path.resolve(
-  process.env.LILAC_STATIC_ROOT ||
+  process.env.STUDIO_STATIC_ROOT ||
     fileURLToPath(new URL('./public/', import.meta.url))
 );
 const THREE_MODULE = path.resolve(
@@ -60,7 +60,6 @@ const ANIMATION_SYSTEM_INSTRUCTION = [
   'LINEAR or STEP interpolation.',
   'For a loop, start/end poses must match.',
   'Use subtle readable movements, not full spins.',
-  "Nodes with a 'Lilac_' prefix are animation pivots from the starter character.",
   'For wings rotate their pivot groups; do not animate both a parent and its child redundantly.',
   'For eye groups scale Y near 0.08 briefly for a blink while X/Z remain 1.',
   'If an existing clip is supplied, return the complete revised clip preserving unrelated tracks.',
@@ -114,13 +113,9 @@ function sessionIdFromRequest(request) {
   const cookie = (request.headers.cookie || '')
     .split(';')
     .map(cookie => cookie.trim())
-    .find(
-      cookie =>
-        cookie.startsWith('studio_session=') ||
-        cookie.startsWith('lilac_session=')
-    );
+    .find(cookie => cookie.startsWith('studio_session='));
 
-  return cookie?.slice(cookie.indexOf('=') + 1);
+  return cookie?.slice('studio_session='.length);
 }
 
 function createSession() {

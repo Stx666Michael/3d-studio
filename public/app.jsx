@@ -3,6 +3,7 @@ import {createRoot} from 'react-dom/client';
 
 import editorShell from './editor-shell.html?raw';
 import './generation.css';
+import './scenes.css';
 import './style.css';
 
 function EditorApp() {

@@ -1,7 +1,7 @@
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 
-process.env.LILAC_STATIC_ROOT = path.resolve(
+process.env.STUDIO_STATIC_ROOT = path.resolve(
   fileURLToPath(new URL('./dist/', import.meta.url))
 );
 

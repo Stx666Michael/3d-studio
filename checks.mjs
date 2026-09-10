@@ -16,6 +16,11 @@ import {
   quat,
   slerp
 } from './public/engine.mjs';
+import {
+  MAX_PROJECT_GLB_LENGTH,
+  parseProject,
+  serializeProject
+} from './public/project.mjs';
 
 const recipe = {
   name: 'Robot',
@@ -71,7 +76,7 @@ test('rejects GLB imports above the 50 MB limit', () => {
 
 test('owl preserves nine animation clips on export/reimport', async () => {
   const bytes = await readFile(
-    new URL('./public/assets/lilac-animated.glb', import.meta.url)
+    new URL('./public/assets/starter-owl.glb', import.meta.url)
   );
   const original = importGLB(Uint8Array.from(bytes).buffer);
   const imported = importGLB(exportGLB(original));
@@ -86,6 +91,100 @@ test('owl preserves nine animation clips on export/reimport', async () => {
       imported.clips[index].tracks.length
     );
   }
+});
+
+test('GLB export can select one animation or the base pose', () => {
+  const document = fromRecipe(recipe);
+  document.clips = [
+    {
+      id: 'wave',
+      name: 'Wave',
+      duration: 1,
+      loop: true,
+      tracks: [
+        {
+          nodeId: 'body',
+          property: 'translation',
+          interpolation: 'LINEAR',
+          keys: [
+            {time: 0, value: [0, 1, 0]},
+            {time: 1, value: [0, 2, 0]}
+          ]
+        }
+      ]
+    },
+    {
+      id: 'turn',
+      name: 'Turn',
+      duration: 1,
+      loop: false,
+      tracks: [
+        {
+          nodeId: 'body',
+          property: 'rotation',
+          interpolation: 'LINEAR',
+          keys: [
+            {time: 0, value: [0, 0, 0, 1]},
+            {time: 1, value: quat([0, 90, 0])}
+          ]
+        }
+      ]
+    }
+  ];
+
+  assert.deepEqual(
+    importGLB(exportGLB(document, {animationId: 'wave'})).clips.map(
+      clip => clip.name
+    ),
+    ['Wave']
+  );
+  assert.deepEqual(
+    importGLB(exportGLB(document, {animationId: ''})).clips,
+    []
+  );
+  assert.equal(
+    importGLB(exportGLB(document, {animationId: '__all__'})).clips.length,
+    2
+  );
+
+  const empty = importGLB(
+    exportGLB(
+      {name: 'Empty', nodes: [], meshes: [], clips: []},
+      {animationId: ''}
+    )
+  );
+  assert.equal(empty.nodes.length, 0);
+  assert.equal(empty.clips.length, 0);
+});
+
+test('current project format round-trips multiple scenes', () => {
+  assert.equal(LIMITS.scenes, 32);
+  assert.equal(
+    MAX_PROJECT_GLB_LENGTH,
+    Math.ceil(LIMITS.upload / 3) * 4
+  );
+  const first = fromRecipe(recipe);
+  const second = fromRecipe({...recipe, name: 'Second'});
+  const projectText = serializeProject(
+    [
+      {id: 'scene-first', document: first},
+      {id: 'scene-second', document: second}
+    ],
+    'scene-second'
+  );
+  const restored = parseProject(projectText);
+
+  const saved = JSON.parse(projectText);
+  assert.equal(saved.format, '3d-studio-project');
+  assert.equal(saved.version, 1);
+  assert.equal(restored.scenes.length, 2);
+  assert.equal(restored.activeSceneId, 'scene-second');
+  assert.equal(restored.scenes[0].document.nodes.length, first.nodes.length);
+  assert.equal(restored.scenes[1].document.name, 'Second');
+  assert.throws(
+    () => parseProject(JSON.stringify({...saved, format: 'lilac-project'})),
+    /supported 3D Studio project/
+  );
 });
 
 test('keyframe sampling does not mutate rest pose', () => {
@@ -200,6 +299,37 @@ test('server never exposes keys and protects mutations with CSRF', async () => {
   );
 });
 
+test('retired session cookies are rejected', async () => {
+  const server = createApp({
+    fetchImpl: () => {
+      throw Error('No provider call expected');
+    },
+    environmentKey: ''
+  });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+
+  const url = `http://127.0.0.1:${server.address().port}`;
+  try {
+    const response = await fetch(`${url}/api/connection`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Origin: url,
+        Cookie: 'lilac_session=retired-session',
+        'x-csrf-token': 'retired-token'
+      },
+      body: JSON.stringify({
+        key: 'fake-secret-for-test',
+        model: 'gemini-3.8-flash'
+      })
+    });
+
+    assert.equal(response.status, 401);
+  } finally {
+    await new Promise(resolve => server.close(resolve));
+  }
+});
+
 test('Gemini adapter sends a compatible model schema and validates response', async () => {
   await runServer(
     async (url, options) => {
@@ -308,6 +438,14 @@ test('configures Vite for automatic frontend rebuilds', async () => {
     'utf8'
   );
   assert.match(editorShell, /id="generationState"/);
+  assert.match(editorShell, /accept="\.glb,\.3ds"/);
+
+  const editorController = await readFile(
+    new URL('./public/editor-controller.mjs', import.meta.url),
+    'utf8'
+  );
+  assert.match(editorController, /my_project\.3ds/);
+  assert.match(editorController, /file\.name\.endsWith\('\.3ds'\)/);
 
   const generationStyles = await readFile(
     new URL('./public/generation.css', import.meta.url),

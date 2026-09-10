@@ -24,10 +24,22 @@
           <h1 id="projectName">Loading your studio…</h1>
         </div>
 
-        <div class="history">
-          <button id="undo" disabled>Undo</button>
-          <button id="redo" disabled>Redo</button>
-          <button id="fit">Frame model</button>
+        <div class="project-actions">
+          <div class="scene-controls">
+            <label>
+              Scene
+              <select id="sceneSelect" aria-label="Active scene"></select>
+            </label>
+            <button id="newScene">New scene</button>
+            <button id="duplicateScene">Duplicate</button>
+            <button id="deleteScene">Delete</button>
+          </div>
+
+          <div class="history">
+            <button id="undo" disabled>Undo</button>
+            <button id="redo" disabled>Redo</button>
+            <button id="fit">Frame model</button>
+          </div>
         </div>
       </section>
 
@@ -60,7 +72,7 @@
             <span>Drag to orbit · Scroll to zoom</span>
             <span id="meshStats"></span>
           </div>
-          <div id="loading" class="loading">Preparing the owl…</div>
+          <div id="loading" class="loading">Preparing workspace…</div>
         </section>
 
         <aside class="panel inspector">
@@ -134,7 +146,7 @@
 
           <div class="suggestions">
             <button
-              data-prompt="Make the owl gently tilt and blink while thinking. Keep the motion subtle and loop smoothly."
+              data-prompt="Make it gently tilt and blink while thinking. Keep the motion subtle and loop smoothly."
               data-kind="animation"
             >
               Thinking loop
@@ -268,7 +280,7 @@
       </footer>
   </main>
 
-    <input id="file" type="file" accept=".glb,.json" hidden>
+    <input id="file" type="file" accept=".glb,.3ds" hidden>
 
     <dialog id="connectionDialog">
       <form id="connectionForm">
@@ -340,3 +352,38 @@
         <button id="accept" class="primary">Apply to project</button>
       </div>
   </dialog>
+
+    <dialog id="exportDialog">
+      <form id="exportForm">
+        <div class="dialog-heading">
+          <h2>Export GLB</h2>
+          <button
+            type="button"
+            data-close="exportDialog"
+            aria-label="Close export"
+          >
+            ×
+          </button>
+        </div>
+
+        <p>
+          Choose one project scene and the animation data to include in the
+          exported GLB.
+        </p>
+
+        <label>
+          Scene
+          <select id="exportScene"></select>
+        </label>
+
+        <label>
+          Animation
+          <select id="exportAnimation"></select>
+        </label>
+
+        <div class="dialog-actions">
+          <button type="button" data-close="exportDialog">Cancel</button>
+          <button type="submit" class="primary">Export GLB</button>
+        </div>
+      </form>
+    </dialog>
