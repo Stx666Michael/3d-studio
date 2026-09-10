@@ -22,6 +22,7 @@ The key is sent to the local backend and held in server memory for the browser s
 Alternatively copy `.env.example` to `.env` and set GEMINI_API_KEY. This deliberately stores a key in a local file; keep it private. Removing a session key does not remove a server environment key.
 
 Gemini requests are real and may incur charges. Prompts, scene names/transforms and relevant animation tracks are sent to Google; mesh buffers are not. No real user API key was supplied during this build, so the provider request path was tested using mocks, not a live billable generation.
+Before generation, the server counts the request with Gemini and rejects input above 100,000 tokens. Request bodies remain capped at 1 MB. After each generation, the local server prints Gemini input, output and total token usage to its terminal without logging the prompt or API key.
 
 ## Implemented
 - Gemini text-to-model via validated sphere/box/cylinder/cone recipes.

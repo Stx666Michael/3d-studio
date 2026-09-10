@@ -331,43 +331,105 @@ test('retired session cookies are rejected', async () => {
 });
 
 test('Gemini adapter sends a compatible model schema and validates response', async () => {
+  const logs = [];
+  const originalLog = console.log;
+  console.log = (...args) => logs.push(args.join(' '));
+
+  try {
+    await runServer(
+      async (url, options) => {
+        assert(url.startsWith('https://generativelanguage.googleapis.com/'));
+        assert.equal(options.headers['x-goog-api-key'], 'fake-secret-for-test');
+
+        if (url.endsWith(':countTokens')) {
+          assert.equal(
+            JSON.parse(options.body).contents[0].parts[0].text,
+            'A cute robot'
+          );
+          return new Response(JSON.stringify({totalTokens: 12}));
+        }
+
+        const schema = JSON.parse(options.body).generationConfig.responseJsonSchema;
+        assert(schema);
+        assert.equal(schema.properties.parts.minItems, undefined);
+        assert.equal(schema.properties.parts.maxItems, undefined);
+        assert.equal(
+          schema.properties.parts.items.properties.position.minItems,
+          3
+        );
+
+        return new Response(
+          JSON.stringify({
+            candidates: [
+              {
+                finishReason: 'STOP',
+                content: {parts: [{text: JSON.stringify(recipe)}]}
+              }
+            ],
+            usageMetadata: {
+              promptTokenCount: 12,
+              candidatesTokenCount: 34,
+              totalTokenCount: 46
+            }
+          })
+        );
+      },
+      'fake-secret-for-test',
+      async (url, session, headers) => {
+        const response = await fetch(`${url}/api/generate`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({kind: 'model', prompt: 'A cute robot'})
+        });
+
+        assert.equal(response.status, 200);
+        assert.equal((await response.json()).result.name, 'Robot');
+      }
+    );
+  } finally {
+    console.log = originalLog;
+  }
+
+  assert(
+    logs.some(
+      line =>
+        line.includes('Gemini model generation token usage') &&
+        line.includes('input=12') &&
+        line.includes('output=34') &&
+        line.includes('total=46')
+    )
+  );
+});
+
+test('rejects generation input above the token limit before generation', async () => {
+  let generationCalled = false;
+
   await runServer(
     async (url, options) => {
-      assert(url.startsWith('https://generativelanguage.googleapis.com/'));
-      assert.equal(options.headers['x-goog-api-key'], 'fake-secret-for-test');
+      if (url.endsWith(':countTokens')) {
+        return new Response(JSON.stringify({totalTokens: 100001}));
+      }
 
-      const schema = JSON.parse(options.body).generationConfig.responseJsonSchema;
-      assert(schema);
-      assert.equal(schema.properties.parts.minItems, undefined);
-      assert.equal(schema.properties.parts.maxItems, undefined);
-      assert.equal(
-        schema.properties.parts.items.properties.position.minItems,
-        3
-      );
-
-      return new Response(
-        JSON.stringify({
-          candidates: [
-            {
-              finishReason: 'STOP',
-              content: {parts: [{text: JSON.stringify(recipe)}]}
-            }
-          ]
-        })
-      );
+      generationCalled = true;
+      throw Error('generateContent should not be called for oversized input');
     },
     'fake-secret-for-test',
     async (url, session, headers) => {
       const response = await fetch(`${url}/api/generate`, {
         method: 'POST',
         headers,
-        body: JSON.stringify({kind: 'model', prompt: 'A cute robot'})
+        body: JSON.stringify({kind: 'model', prompt: 'A robot'})
       });
 
-      assert.equal(response.status, 200);
-      assert.equal((await response.json()).result.name, 'Robot');
+      assert.equal(response.status, 413);
+      assert.match(
+        (await response.json()).error,
+        /exceeds the 100000-token limit/
+      );
     }
   );
+
+  assert.equal(generationCalled, false);
 });
 
 test('missing keys and malformed Gemini output fail safely', async () => {
@@ -388,17 +450,19 @@ test('missing keys and malformed Gemini output fail safely', async () => {
   );
 
   await runServer(
-    async () =>
-      new Response(
-        JSON.stringify({
-          candidates: [
-            {
-              finishReason: 'STOP',
-              content: {parts: [{text: '{"name":"bad","parts":[]}'}]}
-            }
-          ]
-        })
-      ),
+    async url =>
+      url.endsWith(':countTokens')
+        ? new Response(JSON.stringify({totalTokens: 12}))
+        : new Response(
+            JSON.stringify({
+              candidates: [
+                {
+                  finishReason: 'STOP',
+                  content: {parts: [{text: '{"name":"bad","parts":[]}'}]}
+                }
+              ]
+            })
+          ),
     'fake-secret-for-test',
     async (url, session, headers) => {
       const response = await fetch(`${url}/api/generate`, {

@@ -21,7 +21,8 @@ const THREE_MODULE = path.resolve(
 );
 const sessions = new Map();
 const DEFAULT_MODEL = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
-const MAX_BODY_BYTES = 160000;
+const MAX_INPUT_TOKENS = 100000;
+const MAX_BODY_BYTES = 1000000;
 const GENERATION_TIMEOUT_MS = 85000;
 const SESSION_IDLE_MS = 8 * 60 * 60 * 1000;
 const MIME_TYPES = {
@@ -218,6 +219,20 @@ function providerError(status) {
   );
 }
 
+function tokenCount(value) {
+  return Number.isInteger(value) && value >= 0 ? value : 'unknown';
+}
+
+function logTokenUsage(kind, model, usage) {
+  console.log(
+    `[3D Studio] Gemini ${kind} generation token usage: ` +
+      `input=${tokenCount(usage?.promptTokenCount)}, ` +
+      `output=${tokenCount(usage?.candidatesTokenCount)}, ` +
+      `total=${tokenCount(usage?.totalTokenCount)} ` +
+      `(model=${model})`
+  );
+}
+
 function generationContext(input) {
   const manifest =
     input.kind === 'animation' ? validateManifest(input.manifest) : null;
@@ -289,6 +304,45 @@ async function generateContent({
   });
 
   try {
+    const contentRequest = {
+      systemInstruction: {parts: [{text: system}]},
+      contents: [{role: 'user', parts: [{text: prompt}]}]
+    };
+    const countResponse = await fetchImpl(
+      `https://generativelanguage.googleapis.com/v1beta/models/${session.model}:countTokens`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': key
+        },
+        body: JSON.stringify(contentRequest),
+        signal: controller.signal
+      }
+    );
+
+    if (!countResponse.ok) {
+      throw providerError(countResponse.status);
+    }
+
+    let countData;
+    try {
+      countData = JSON.parse(await countResponse.text());
+    } catch {
+      throw createError(502, 'Gemini token count response was invalid.');
+    }
+
+    const inputTokens = countData.totalTokens;
+    if (!Number.isInteger(inputTokens) || inputTokens < 0) {
+      throw createError(502, 'Gemini token count response was invalid.');
+    }
+    if (inputTokens > MAX_INPUT_TOKENS) {
+      throw createError(
+        413,
+        `Generation input exceeds the ${MAX_INPUT_TOKENS}-token limit (received ${inputTokens}).`
+      );
+    }
+
     const providerResponse = await fetchImpl(
       `https://generativelanguage.googleapis.com/v1beta/models/${session.model}:generateContent`,
       {
@@ -298,12 +352,11 @@ async function generateContent({
           'x-goog-api-key': key
         },
         body: JSON.stringify({
-          systemInstruction: {parts: [{text: system}]},
-          contents: [{role: 'user', parts: [{text: prompt}]}],
+          ...contentRequest,
           generationConfig: {
             responseMimeType: 'application/json',
             responseJsonSchema: schema,
-            maxOutputTokens: 10000
+            maxOutputTokens: 100000
           }
         }),
         signal: controller.signal
@@ -320,6 +373,11 @@ async function generateContent({
     }
 
     const data = JSON.parse(raw);
+    const usage = data.usageMetadata || null;
+    logTokenUsage(input.kind, session.model, {
+      ...(usage || {}),
+      promptTokenCount: usage?.promptTokenCount ?? inputTokens
+    });
     const candidate = data.candidates?.[0];
     if (candidate?.finishReason && candidate.finishReason !== 'STOP') {
       throw createError(
@@ -359,7 +417,7 @@ async function generateContent({
       throw createError(422, `Generated content failed validation: ${error.message}`);
     }
 
-    return {kind: input.kind, result, usage: data.usageMetadata || null};
+    return {kind: input.kind, result, usage};
   } finally {
     clearTimeout(timeout);
     session.busy = false;
