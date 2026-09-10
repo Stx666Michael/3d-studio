@@ -303,6 +303,17 @@ test('configures Vite for automatic frontend rebuilds', async () => {
   );
   assert.match(indexHtml, /id="root"/);
   assert.match(indexHtml, /src="\/app\.jsx"/);
+  const editorShell = await readFile(
+    new URL('./public/editor-shell.html', import.meta.url),
+    'utf8'
+  );
+  assert.match(editorShell, /id="generationState"/);
+
+  const generationStyles = await readFile(
+    new URL('./public/generation.css', import.meta.url),
+    'utf8'
+  );
+  assert.match(generationStyles, /@keyframes generation-spin/);
 
   const {default: viteConfig} = await import('./vite.config.mjs');
   assert.equal(

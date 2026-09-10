@@ -152,6 +152,16 @@
             <button id="cancelJob" hidden>Cancel</button>
           </div>
 
+          <div
+            id="generationState"
+            class="generation-state"
+            hidden
+            aria-live="polite"
+          >
+            <span class="generation-spinner" aria-hidden="true"></span>
+            <span id="generationMessage">Generating…</span>
+          </div>
+
           <p id="keyHint" class="small muted">
             Add a Gemini API key to generate. The starter editor works without
             one.

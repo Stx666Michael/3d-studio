@@ -579,6 +579,20 @@ function buildCandidate(kind, result, manifest, sourceClip) {
   };
 }
 
+function setGenerationState(active, kind = '') {
+  $('generationState').hidden = !active;
+  if (!active) {
+    $('generate').removeAttribute('aria-busy');
+    return;
+  }
+
+  $('generate').setAttribute('aria-busy', 'true');
+  $('generationMessage').textContent =
+    kind === 'model'
+      ? 'Generating model geometry with Gemini…'
+      : 'Generating animation with Gemini…';
+}
+
 async function generate() {
   if (!session?.configured) {
     $('connectionDialog').showModal();
@@ -599,6 +613,7 @@ async function generate() {
   job = new AbortController();
   $('generate').disabled = true;
   $('cancelJob').hidden = false;
+  setGenerationState(true, kind);
   status(
     `Gemini is generating validated ${
       kind === 'model' ? 'model geometry' : 'animation tracks'
@@ -650,6 +665,7 @@ async function generate() {
     job = null;
     $('generate').disabled = false;
     $('cancelJob').hidden = true;
+    setGenerationState(false);
   }
 }
 
