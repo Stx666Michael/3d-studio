@@ -1,0 +1,15 @@
+{
+  "name": "lilac-studio-mvp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Local-first Gemini-assisted 3D model and keyframe editor",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node --env-file-if-exists=.env server.mjs",
+    "test": "node --test checks.mjs"
+  },
+  "license": "UNLICENSED"
+}
