@@ -955,7 +955,7 @@ export function exportGLB(document) {
   const accessors = [];
   const writer = createAccessorWriter(chunks, bufferViews, accessors);
   const gltf = {
-    asset: {version: '2.0', generator: 'Lilac Studio MVP'},
+    asset: {version: '2.0', generator: '3D Studio'},
     scene: 0,
     scenes: [{name: document.name, nodes: []}],
     nodes: [],

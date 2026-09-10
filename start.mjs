@@ -10,7 +10,7 @@ const port = Number(process.env.PORT || 3000);
 
 createApp().listen(port, '127.0.0.1', () => {
   console.log(
-    `Lilac Studio: http://127.0.0.1:${port}\n` +
+    `3D Studio: http://127.0.0.1:${port}\n` +
       'Production frontend bundle served locally. Keys stay in server memory. Ctrl+C to stop.'
   );
 });

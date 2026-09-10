@@ -1,9 +1,9 @@
-# Lilac Studio — Gemini MVP 0.1
+# 3D Studio — Gemini MVP 0.1
 
 A local, runnable 3D model and animation editor. Includes the purple owl with nine animation clips.
 
 ## Start
-Install Node.js 22 or newer. Unzip, open a terminal in `lilac-studio`, then run:
+Install Node.js 22 or newer. Open a terminal in `3d-studio`, then run:
 
 ```sh
 npm install
@@ -31,13 +31,13 @@ Gemini requests are real and may incur charges. Prompts, scene names/transforms 
 - Nine owl clips; play/pause/stop, speed, loop and scrubbing controls.
 - New/duplicate clips; keyframe insertion, replacement and deletion; LINEAR/STEP interpolation.
 - Separate base-pose and keyframe-pose editing; undo/redo (20 transactions).
-- Supported GLB import/export and local `.lilac.json` save/reopen.
+- Supported GLB import/export and local `.3dstudio.json` save/reopen.
 - Responsive light/dark interface. Playback is user-triggered and pauses in hidden tabs.
 - React frontend bootstrapped with Vite HMR and a production build.
 - Three.js renderer with scene hierarchy, standard materials, lighting, selection highlighting and damped orbit controls.
 
 ## Walkthrough
-Select `hover-wave`, press Play, then stop. Select `Lilac_rightWing` in Scene, choose Rotation and Keyframe pose, seek to a time, change Z and insert/update a keyframe. Add a Gemini key and try “Make the owl gently tilt and blink while thinking. Loop smoothly over three seconds.” Review the result before applying. Export GLB to move it into another tool.
+Select `hover-wave`, press Play, then stop. Select the right wing in Scene, choose Rotation and Keyframe pose, seek to a time, change Z and insert/update a keyframe. Add a Gemini key and try “Make the owl gently tilt and blink while thinking. Loop smoothly over three seconds.” Review the result before applying. Export GLB to move it into another tool.
 
 ## MVP scope and limitations
 This is a single-user local development app, not a production hosted service. React and Vite provide the frontend runtime and build workflow; Three.js provides the WebGL renderer. The Node backend remains local-first and does not require a separate database.
@@ -76,7 +76,7 @@ Browser integration also exercised playback, keyframe editing, undo/redo, secret
 - `public/editor-controller.mjs`: editor history, controls and generation flow.
 - `public/renderer.mjs`: Three.js scene renderer.
 - `public/index.html`, `public/style.css`: Vite HTML entry and UI styles.
-- `public/assets/lilac-animated.glb`: starter model.
+- `public/assets/lilac-animated.glb`: starter owl asset retained for compatibility.
 - `checks.mjs`: automated verification.
 
 Gemini adapter uses the generateContent endpoint, x-goog-api-key and JSON-schema structured responses. Reference: https://ai.google.dev/gemini-api/docs/structured-output

@@ -327,7 +327,7 @@ async function starter() {
   }
 
   const documentData = importGLB(await response.arrayBuffer());
-  documentData.name = 'Lilac · Purple owl';
+  documentData.name = '3D Studio · Purple owl';
   setDoc(documentData);
   $('loading').hidden = true;
   status('Starter loaded: nine editable animation clips. Select a clip and press Play.');
@@ -494,7 +494,7 @@ async function importFile() {
         typeof project.glb !== 'string' ||
         project.glb.length > MAX_PROJECT_GLB_LENGTH
       ) {
-        throw Error('Not a supported Lilac project.');
+        throw Error('Not a supported 3D Studio project.');
       }
 
       const bytes = Uint8Array.from(atob(project.glb), character =>
@@ -505,7 +505,7 @@ async function importFile() {
         documentData.recipe = validateRecipe(project.recipe);
       }
     } else {
-      throw Error('Use .glb or a saved .lilac.json project.');
+      throw Error('Use .glb or a saved .3dstudio.json project.');
     }
 
     documentData.name = file.name.replace(/\.(glb|lilac\.json|json)$/, '');
@@ -532,7 +532,7 @@ function saveProject() {
       glb: btoa(parts.join('')),
       recipe: doc.recipe || null
     }),
-    'studio.lilac.json',
+    'studio.3dstudio.json',
     'application/json'
   );
   status('Project downloaded. Keep this file to resume later; this MVP has no cloud storage.');
@@ -803,7 +803,7 @@ function initializeControls() {
   $('import').onclick = () => $('file').click();
   $('file').onchange = handle(importFile);
   $('export').onclick = handle(() => {
-    download(exportGLB(doc), 'lilac-model.glb', 'model/gltf-binary');
+    download(exportGLB(doc), '3d-studio-model.glb', 'model/gltf-binary');
     status('Exported GLB with non-empty animation clips.');
   });
   $('save').onclick = handle(saveProject);

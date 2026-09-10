@@ -111,11 +111,16 @@ function setSecurityHeaders(response) {
 }
 
 function sessionIdFromRequest(request) {
-  return (request.headers.cookie || '')
+  const cookie = (request.headers.cookie || '')
     .split(';')
     .map(cookie => cookie.trim())
-    .find(cookie => cookie.startsWith('lilac_session='))
-    ?.slice(14);
+    .find(
+      cookie =>
+        cookie.startsWith('studio_session=') ||
+        cookie.startsWith('lilac_session=')
+    );
+
+  return cookie?.slice(cookie.indexOf('=') + 1);
 }
 
 function createSession() {
@@ -146,7 +151,7 @@ function getSession(request, response, url) {
     sessions.set(newId, session);
     response.setHeader(
       'Set-Cookie',
-      `lilac_session=${newId}; HttpOnly; SameSite=Strict; Path=/; Max-Age=28800`
+      `studio_session=${newId}; HttpOnly; SameSite=Strict; Path=/; Max-Age=28800`
     );
   }
 
@@ -542,7 +547,7 @@ if (
   const port = Number(process.env.PORT || 3000);
   createApp().listen(port, '127.0.0.1', () => {
     console.log(
-      `Lilac Studio: http://127.0.0.1:${port}\n` +
+      `3D Studio: http://127.0.0.1:${port}\n` +
         'Local single-user preview. Keys stay in server memory. Ctrl+C to stop.'
     );
   });

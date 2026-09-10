@@ -21,7 +21,7 @@ const viteServer = await createViteServer({
 await viteServer.listen();
 
 console.log(
-  'Lilac Studio development server: http://127.0.0.1:3000\n' +
+  '3D Studio development server: http://127.0.0.1:3000\n' +
     'Frontend changes use Vite HMR; API requests use the local backend on port 3001.'
 );
 

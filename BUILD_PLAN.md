@@ -245,7 +245,7 @@ Classify it as model creation, geometry modification, appearance change, animati
 Build a compact manifest containing selected nodes, movable components, skeleton, morph targets, current clip, bounds/orientation, and allowed edit scope.
 
 ```
-Model: Lilac
+Model: Purple owl
 Selected node: Right wing
 Movable components: body, left wing, right wing, eyes
 Skeleton: none
