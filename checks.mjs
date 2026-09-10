@@ -502,6 +502,9 @@ test('configures Vite for automatic frontend rebuilds', async () => {
     'utf8'
   );
   assert.match(editorShell, /id="generationState"/);
+  assert.match(editorShell, /id="showAnimationJson"/);
+  assert.match(editorShell, /id="showObjectJson"/);
+  assert.match(editorShell, /id="deleteClip"/);
   assert.match(editorShell, /accept="\.glb,\.3ds"/);
 
   const editorController = await readFile(
@@ -510,6 +513,9 @@ test('configures Vite for automatic frontend rebuilds', async () => {
   );
   assert.match(editorController, /my_project\.3ds/);
   assert.match(editorController, /file\.name\.endsWith\('\.3ds'\)/);
+  assert.match(editorController, /setDoc\(candidate\.document\)/);
+  assert.match(editorController, /function deleteClip\(\)/);
+  assert.doesNotMatch(editorController, /previewDialog/);
 
   const generationStyles = await readFile(
     new URL('./public/generation.css', import.meta.url),

@@ -17,6 +17,28 @@
   animation: generation-spin 0.8s linear infinite;
 }
 
+.generation-json-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.generation-json-controls label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+}
+
+.generation-json-controls label > input {
+  margin-top: 0;
+}
+
+.generation-json {
+  margin-top: 8px;
+}
+
 @keyframes generation-spin {
   to {
     transform: rotate(360deg);

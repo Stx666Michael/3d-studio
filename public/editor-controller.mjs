@@ -22,6 +22,7 @@ const $ = id => document.getElementById(id);
 const AXES = ['x', 'y', 'z'];
 const EDITABLE_CLIP_CONTROLS = [
   'duplicate',
+  'deleteClip',
   'updateClip',
   'clipName',
   'duration',
@@ -39,7 +40,6 @@ let time = 0;
 let playing = false;
 let session = null;
 let version = 0;
-let pending = null;
 let job = null;
 let last = 0;
 
@@ -84,8 +84,6 @@ function activateScene(sceneId) {
     throw Error('The selected scene no longer exists.');
   }
 
-  pending = null;
-  $('previewDialog').close();
   activeSceneId = scene.id;
   undo.length = 0;
   redo.length = 0;
@@ -128,6 +126,22 @@ function duplicateScene() {
   duplicate.name = `${doc.name} copy`;
   addScene(duplicate);
   status(`Duplicated scene: ${duplicate.name}.`);
+}
+
+function deleteClip() {
+  const clip = active();
+  if (!clip || !window.confirm(`Delete "${clip.name}"?`)) {
+    return;
+  }
+
+  const index = doc.clips.indexOf(clip);
+  commit(() => {
+    doc.clips.splice(index, 1);
+    const nextIndex = Math.min(index, doc.clips.length - 1);
+    clipId = nextIndex >= 0 ? doc.clips[nextIndex].id : '';
+    time = 0;
+  });
+  status(`Deleted clip: ${clip.name}.`);
 }
 
 function createNewScene() {
@@ -683,6 +697,20 @@ function setGenerationState(active, kind = '') {
       : 'Generating animation with Gemini…';
 }
 
+function updateGeneratedJson(kind, result) {
+  const isObject = kind === 'model';
+  const toggle = $(isObject ? 'showObjectJson' : 'showAnimationJson');
+  const output = $(isObject ? 'objectJson' : 'animationJson');
+
+  output.textContent = JSON.stringify(result, null, 2);
+  toggle.disabled = false;
+  output.hidden = !toggle.checked;
+}
+
+function syncGeneratedJson(toggleId, outputId) {
+  $(outputId).hidden = !$(toggleId).checked;
+}
+
 async function generate() {
   if (!session?.configured) {
     $('connectionDialog').showModal();
@@ -731,20 +759,18 @@ async function generate() {
     }
 
     const candidate = buildCandidate(kind, response.result, manifest, sourceClip);
-    pending = {doc: candidate.document, kind, clipId: candidate.clipId};
-    renderer.setDocument(candidate.document);
-
-    $('previewSummary').textContent =
+    setDoc(candidate.document);
+    clipId = candidate.clipId || doc.clips[0]?.id || '';
+    time = 0;
+    update();
+    updateGeneratedJson(kind, response.result);
+    status(
       kind === 'model'
-        ? `${candidate.document.name}: ${candidate.document.meshes.length} model parts. Applying replaces the current scene; Undo will restore it.`
-        : `${candidate.document.clips.find(clip => clip.id === candidate.clipId)?.name}: editable animation tracks. ${
-            kind === 'revise'
-              ? 'Replaces the active clip.'
-              : 'Adds a new clip.'
-          }`;
-    $('previewJson').textContent = JSON.stringify(response.result, null, 2);
-    $('previewDialog').showModal();
-    status('Preview ready. Review and apply or discard.');
+        ? 'Applied the generated model directly to the project. Undo will restore the previous scene.'
+        : `Applied the generated ${
+            kind === 'revise' ? 'clip revision' : 'animation'
+          } directly to the project.`
+    );
   } catch (error) {
     if (error.name === 'AbortError') {
       status('Generation cancelled. Project unchanged.');
@@ -757,32 +783,6 @@ async function generate() {
     $('cancelJob').hidden = true;
     setGenerationState(false);
   }
-}
-
-function rejectPreview() {
-  if (!pending) {
-    return;
-  }
-
-  pending = null;
-  renderer.setDocument(doc);
-  $('previewDialog').close();
-  status('Discarded AI preview. Project unchanged.');
-}
-
-function acceptPreview() {
-  if (!pending) {
-    return;
-  }
-
-  const preview = pending;
-  pending = null;
-  setDoc(preview.doc);
-  clipId = preview.clipId || doc.clips[0]?.id || '';
-  time = 0;
-  $('previewDialog').close();
-  update();
-  status('Applied Gemini result. You can refine it manually or Undo.');
 }
 
 function frame(now) {
@@ -798,7 +798,7 @@ function frame(now) {
   }
 
   const clip = active();
-  if (playing && clip && !pending) {
+  if (playing && clip) {
     time += delta * Number($('speed').value);
     if (time > clip.duration) {
       if (clip.loop) {
@@ -812,18 +812,7 @@ function frame(now) {
     syncTime();
   }
 
-  const view = pending?.doc || doc;
-  const viewClip = pending
-    ? view.clips.find(item => item.id === pending.clipId)
-    : clip;
-  const renderTime =
-    pending?.kind === 'model'
-      ? 0
-      : pending
-        ? (now / 1000) % (viewClip?.duration || 1)
-        : time;
-
-  renderer.render(poses(view, viewClip, renderTime), selected);
+  renderer.render(poses(doc, clip, time), selected);
 }
 
 function updateExportAnimationOptions() {
@@ -943,6 +932,7 @@ function initializeControls() {
       clipId = clip.id;
       time = 0;
     });
+  $('deleteClip').onclick = handle(deleteClip);
   $('duplicate').onclick = () => {
     const clip = active();
     if (clip) {
@@ -1020,13 +1010,10 @@ function initializeControls() {
 
   $('generate').onclick = handle(generate);
   $('cancelJob').onclick = () => job?.abort();
-  $('reject').onclick = rejectPreview;
-  $('rejectX').onclick = rejectPreview;
-  $('previewDialog').addEventListener('cancel', event => {
-    event.preventDefault();
-    rejectPreview();
-  });
-  $('accept').onclick = acceptPreview;
+  $('showAnimationJson').onchange = () =>
+    syncGeneratedJson('showAnimationJson', 'animationJson');
+  $('showObjectJson').onchange = () =>
+    syncGeneratedJson('showObjectJson', 'objectJson');
 }
 
 window.addEventListener('beforeunload', event => {

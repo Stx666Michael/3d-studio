@@ -160,7 +160,7 @@
           </div>
 
           <div class="generate-row">
-            <button id="generate" class="primary">Generate preview</button>
+            <button id="generate" class="primary">Generate and apply</button>
             <button id="cancelJob" hidden>Cancel</button>
           </div>
 
@@ -173,6 +173,29 @@
             <span class="generation-spinner" aria-hidden="true"></span>
             <span id="generationMessage">Generating…</span>
           </div>
+
+          <div class="generation-json-controls" aria-label="Generated JSON visibility">
+            <label class="check">
+              <input
+                id="showAnimationJson"
+                type="checkbox"
+                aria-controls="animationJson"
+                disabled
+              >
+              Show animation JSON
+            </label>
+            <label class="check">
+              <input
+                id="showObjectJson"
+                type="checkbox"
+                aria-controls="objectJson"
+                disabled
+              >
+              Show object JSON
+            </label>
+          </div>
+          <pre id="animationJson" class="generation-json" hidden></pre>
+          <pre id="objectJson" class="generation-json" hidden></pre>
 
           <p id="keyHint" class="small muted">
             Add a Gemini API key to generate. The starter editor works without
@@ -190,6 +213,7 @@
             </select>
             <button id="newClip">New clip</button>
             <button id="duplicate">Duplicate</button>
+            <button id="deleteClip">Delete clip</button>
             <button id="play" class="primary">Play</button>
             <button id="stop">Stop</button>
           </div>
@@ -329,29 +353,6 @@
         </div>
       </form>
     </dialog>
-
-  <dialog id="previewDialog">
-      <div class="dialog-heading">
-        <h2>Review Gemini output</h2>
-        <button id="rejectX" aria-label="Reject preview">×</button>
-      </div>
-
-      <p id="previewSummary"></p>
-      <p class="small muted">
-        The generated result is previewed in the viewport behind this panel.
-        Nothing is committed until you apply.
-      </p>
-
-      <details>
-        <summary>Inspect validated JSON</summary>
-        <pre id="previewJson"></pre>
-      </details>
-
-      <div class="dialog-actions">
-        <button id="reject">Discard</button>
-        <button id="accept" class="primary">Apply to project</button>
-      </div>
-  </dialog>
 
     <dialog id="exportDialog">
       <form id="exportForm">

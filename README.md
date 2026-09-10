@@ -27,10 +27,10 @@ Before generation, the server counts the request with Gemini and rejects input a
 ## Implemented
 - Gemini text-to-model via validated sphere/box/cylinder/cone recipes.
 - Gemini animation generation and active-clip revision via validated editable tracks.
-- AI preview, accept/discard, cancellation and scene-revision conflict detection.
+- Direct AI application, optional generated animation/object JSON inspection, cancellation and scene-revision conflict detection.
 - Orbit/zoom/frame, scene selection and numeric local-transform editing.
 - Nine owl clips; play/pause/stop, speed, loop and scrubbing controls.
-- New/duplicate clips; keyframe insertion, replacement and deletion; LINEAR/STEP interpolation.
+- New/duplicate/delete clips; keyframe insertion, replacement and deletion; LINEAR/STEP interpolation.
 - Separate base-pose and keyframe-pose editing; undo/redo (20 transactions).
 - Supported GLB import/export and local `.3ds` project save/reopen with up to 32 independent scenes.
 - New, duplicate, delete and switch project scenes; GLB imports are added as new scenes.
@@ -40,7 +40,7 @@ Before generation, the server counts the request with Gemini and rejects input a
 - Three.js renderer with scene hierarchy, standard materials, lighting, selection highlighting and damped orbit controls.
 
 ## Walkthrough
-Select `hover-wave`, press Play, then stop. Select the right wing in Scene, choose Rotation and Keyframe pose, seek to a time, change Z and insert/update a keyframe. Use **New scene** or **Duplicate** to create another project scene. Add a Gemini key and try “Make the owl gently tilt and blink while thinking. Loop smoothly over three seconds.” Review the result before applying. Use **Export GLB** to choose a scene and whether to include the base pose, one animation, or all animations.
+Select `hover-wave`, press Play, then stop. Select the right wing in Scene, choose Rotation and Keyframe pose, seek to a time, change Z and insert/update a keyframe. Use **New scene** or **Duplicate** to create another project scene. Add a Gemini key and try “Make the owl gently tilt and blink while thinking. Loop smoothly over three seconds.” The validated result applies directly; use the JSON checkboxes when you need to inspect generated animation or object data. Use **Delete clip** to remove the selected animation. Use **Export GLB** to choose a scene and whether to include the base pose, one animation, or all animations.
 
 ## MVP scope and limitations
 This is a single-user local development app, not a production hosted service. React and Vite provide the frontend runtime and build workflow; Three.js provides the WebGL renderer. The Node backend remains local-first and does not require a separate database.
@@ -49,7 +49,7 @@ No arbitrary generated JavaScript is executed. Structured recipes and animation 
 
 GLB support: self-contained glTF 2.0, solid opaque materials, optional vertex colours, unskinned triangle geometry, one primitive per mesh and LINEAR/STEP translation/rotation/scale clips. Imports are limited to 50 MB, 1,000,000 vertices and 1,000,000 triangles. Unsupported skins, textures, transparency, morph targets, compression, sparse accessors and cubic tracks are rejected rather than silently stripped. Static matrix nodes render but are read-only. Use a current WebGL2 browser.
 
-No skeletal rigging, texture generation, transform gizmos, curve graph editor, retargeting, interaction-state authoring or cloud persistence yet. Model prompts create a replacement scene after acceptance; targeted AI geometry revision is deferred. New model recipes are limited to 64 primitives.
+No skeletal rigging, texture generation, transform gizmos, curve graph editor, retargeting, interaction-state authoring or cloud persistence yet. Model prompts create a replacement scene immediately; targeted AI geometry revision is deferred. New model recipes are limited to 64 primitives.
 
 Keyframes can be inserted/replaced/deleted. To move a key in time, delete its old entry and reinsert its values at the new time. Duration changes do not retime existing keys. Empty clips are omitted from GLB/project export; add a key before saving. Project saves use the current `3d-studio-project` format and contain one embedded GLB plus optional recipe per scene. Retired project formats are rejected rather than migrated. History is not persisted and canonical IDs are regenerated on import while bindings are preserved.
 
@@ -63,9 +63,9 @@ Do not expose this server directly to the internet. Shared deployment needs auth
 npm test
 npm run build
 ```
-Fourteen checks cover bounded recipes, primitive GLB round-trip, import limits, preservation of all nine owl clips, selective animation and empty-scene export, multi-scene project round-trips and retired-format rejection, quaternion sampling, rest-pose immutability, animation validation, CSRF/key isolation, retired-cookie rejection, mocked Gemini structured-output requests, missing keys and malformed output, plus the React/Vite configuration.
+Fifteen checks cover bounded recipes, primitive GLB round-trip, import limits, preservation of all nine owl clips, selective animation and empty-scene export, multi-scene project round-trips and retired-format rejection, quaternion sampling, rest-pose immutability, animation validation, CSRF/key isolation, retired-cookie rejection, mocked Gemini structured-output requests, input-token limits, missing keys and malformed output, plus the React/Vite configuration.
 
-Browser integration also exercised playback, keyframe editing, undo/redo, secret-input clearing, mocked AI preview/reject/apply/undo and GLB export/reimport, with no JavaScript errors in the passing run. Desktop/mobile screens were inspected.
+Browser integration also exercised playback, keyframe editing, undo/redo, secret-input clearing, mocked direct AI apply/undo and GLB export/reimport, with no JavaScript errors in the passing run. Desktop/mobile screens were inspected.
 
 ## Files
 - `server.mjs`: local server, sessions, Gemini adapter and safe Three.js module delivery.
