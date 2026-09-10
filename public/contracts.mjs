@@ -3,9 +3,9 @@ export const LIMITS = {
   parts: 64,
   tracks: 128,
   keys: 2048,
-  vertices: 250000,
-  triangles: 250000,
-  upload: 16 * 1024 * 1024
+  vertices: 1_000_000,
+  triangles: 1_000_000,
+  upload: 50 * 1024 * 1024
 };
 
 const fail = message => {

@@ -3,7 +3,11 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 
 import {createApp} from './server.mjs';
-import {validateAnimation, validateRecipe} from './public/contracts.mjs';
+import {
+  LIMITS,
+  validateAnimation,
+  validateRecipe
+} from './public/contracts.mjs';
 import {
   exportGLB,
   fromRecipe,
@@ -53,6 +57,16 @@ test('all primitive types round-trip through GLB', () => {
     assert.equal(imported.meshes.length, 1);
     assert(imported.meshes[0].positions.every(Number.isFinite));
   }
+});
+
+test('rejects GLB imports above the 50 MB limit', () => {
+  assert.equal(LIMITS.upload, 50 * 1024 * 1024);
+  assert.equal(LIMITS.vertices, 1_000_000);
+  assert.equal(LIMITS.triangles, 1_000_000);
+  assert.throws(
+    () => importGLB({byteLength: LIMITS.upload + 1}),
+    /Maximum file size is 50 MB/
+  );
 });
 
 test('owl preserves nine animation clips on export/reimport', async () => {
@@ -176,6 +190,12 @@ test('server never exposes keys and protects mutations with CSRF', async () => {
         403
       );
       assert.equal((await fetch(`${url}/engine.mjs`)).status, 200);
+      const threeResponse = await fetch(`${url}/vendor/three.module.js`);
+      assert.equal(threeResponse.status, 200);
+      assert.match(
+        threeResponse.headers.get('content-type') || '',
+        /javascript/
+      );
     }
   );
 });
@@ -259,5 +279,38 @@ test('missing keys and malformed Gemini output fail safely', async () => {
 
       assert.equal(response.status, 422);
     }
+  );
+});
+
+test('configures Vite for automatic frontend rebuilds', async () => {
+  const packageJson = JSON.parse(
+    await readFile(new URL('./package.json', import.meta.url))
+  );
+
+  assert.equal(
+    packageJson.scripts.dev,
+    'node --env-file-if-exists=.env dev.mjs'
+  );
+  assert.equal(packageJson.scripts.build, 'vite build');
+  assert(packageJson.dependencies?.react);
+  assert(packageJson.dependencies?.['react-dom']);
+  assert(packageJson.devDependencies?.vite);
+  assert(packageJson.devDependencies?.['@vitejs/plugin-react']);
+
+  const indexHtml = await readFile(
+    new URL('./public/index.html', import.meta.url),
+    'utf8'
+  );
+  assert.match(indexHtml, /id="root"/);
+  assert.match(indexHtml, /src="\/app\.jsx"/);
+
+  const {default: viteConfig} = await import('./vite.config.mjs');
+  assert.equal(
+    viteConfig.root,
+    new URL('./public/', import.meta.url).pathname.replace(/\/$/, '')
+  );
+  assert.equal(
+    viteConfig.server.proxy['/api'].target,
+    'http://127.0.0.1:3001'
   );
 });

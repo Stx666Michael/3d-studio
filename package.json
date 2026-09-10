@@ -8,8 +8,20 @@
     "node": ">=22"
   },
   "scripts": {
-    "start": "node --env-file-if-exists=.env server.mjs",
+    "build": "vite build",
+    "dev": "node --env-file-if-exists=.env dev.mjs",
+    "prestart": "npm run build",
+    "start": "node --env-file-if-exists=.env start.mjs",
     "test": "node --test checks.mjs"
   },
-  "license": "UNLICENSED"
+  "license": "UNLICENSED",
+  "dependencies": {
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "three": "^0.186.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^6.1.1",
+    "vite": "^8.3.0"
+  }
 }

@@ -6,10 +6,13 @@ A local, runnable 3D model and animation editor. Includes the purple owl with ni
 Install Node.js 22 or newer. Unzip, open a terminal in `lilac-studio`, then run:
 
 ```sh
-npm start
+npm install
+npm run dev
 ```
 
-Open http://127.0.0.1:3000. No npm dependencies need installing. The editor and starter owl work without an API key.
+Open http://127.0.0.1:3000. Vite watches the React frontend and applies HMR when source files change. The local Gemini API server runs behind the Vite proxy on port 3001.
+
+For a production-style local run, use `npm start`. It builds the frontend into `dist/` first, then starts the local server on port 3000.
 
 ## Connect Gemini
 Open **Gemini connection** in the app. Enter a Gemini Developer API key and a structured-output-capable model available to your account. The default model ID is `gemini-3.8-flash`; it is editable. Obtain a key from https://aistudio.google.com/apikey.
@@ -30,16 +33,18 @@ Gemini requests are real and may incur charges. Prompts, scene names/transforms 
 - Separate base-pose and keyframe-pose editing; undo/redo (20 transactions).
 - Supported GLB import/export and local `.lilac.json` save/reopen.
 - Responsive light/dark interface. Playback is user-triggered and pauses in hidden tabs.
+- React frontend bootstrapped with Vite HMR and a production build.
+- Three.js renderer with scene hierarchy, standard materials, lighting, selection highlighting and damped orbit controls.
 
 ## Walkthrough
 Select `hover-wave`, press Play, then stop. Select `Lilac_rightWing` in Scene, choose Rotation and Keyframe pose, seek to a time, change Z and insert/update a keyframe. Add a Gemini key and try “Make the owl gently tilt and blink while thinking. Loop smoothly over three seconds.” Review the result before applying. Export GLB to move it into another tool.
 
 ## MVP scope and limitations
-This is a single-user local development app, not a production hosted service. The first vertical slice uses native WebGL2 and Node built-ins to run without dependency installation. A React/Three.js migration remains a next step.
+This is a single-user local development app, not a production hosted service. React and Vite provide the frontend runtime and build workflow; Three.js provides the WebGL renderer. The Node backend remains local-first and does not require a separate database.
 
 No arbitrary generated JavaScript is executed. Structured recipes and animation tracks are the safe first path; isolated code execution is deferred.
 
-GLB support: self-contained glTF 2.0, solid opaque materials, optional vertex colours, unskinned triangle geometry, one primitive per mesh and LINEAR/STEP translation/rotation/scale clips. Unsupported skins, textures, transparency, morph targets, compression, sparse accessors and cubic tracks are rejected rather than silently stripped. Static matrix nodes render but are read-only. Use a current WebGL2 browser.
+GLB support: self-contained glTF 2.0, solid opaque materials, optional vertex colours, unskinned triangle geometry, one primitive per mesh and LINEAR/STEP translation/rotation/scale clips. Imports are limited to 50 MB, 1,000,000 vertices and 1,000,000 triangles. Unsupported skins, textures, transparency, morph targets, compression, sparse accessors and cubic tracks are rejected rather than silently stripped. Static matrix nodes render but are read-only. Use a current WebGL2 browser.
 
 No skeletal rigging, texture generation, transform gizmos, curve graph editor, retargeting, interaction-state authoring or cloud persistence yet. Model prompts create a replacement scene after acceptance; targeted AI geometry revision is deferred. New model recipes are limited to 64 primitives.
 
@@ -53,17 +58,24 @@ Do not expose this server directly to the internet. Shared deployment needs auth
 ## Verify
 ```sh
 npm test
+npm run build
 ```
-Nine checks cover bounded recipes, primitive GLB round-trip, preservation of all nine owl clips, quaternion sampling, rest-pose immutability, animation validation, CSRF/key isolation, mocked Gemini structured-output requests, missing keys and malformed output.
+Eleven checks cover bounded recipes, primitive GLB round-trip, import limits, preservation of all nine owl clips, quaternion sampling, rest-pose immutability, animation validation, CSRF/key isolation, mocked Gemini structured-output requests, missing keys and malformed output, plus the React/Vite configuration.
 
 Browser integration also exercised playback, keyframe editing, undo/redo, secret-input clearing, mocked AI preview/reject/apply/undo and GLB export/reimport, with no JavaScript errors in the passing run. Desktop/mobile screens were inspected.
 
 ## Files
-- `server.mjs`: local server, sessions and Gemini adapter.
+- `server.mjs`: local server, sessions, Gemini adapter and safe Three.js module delivery.
+- `dev.mjs`: Vite HMR server plus the local API server.
+- `start.mjs`: production bundle server entry point.
+- `vite.config.mjs`: React/Vite development proxy and build configuration.
 - `public/contracts.mjs`: schemas and validation.
-- `public/engine.mjs`: renderer, primitives, GLB I/O and animation sampling.
-- `public/app.mjs`: editor, history, controls and generation flow.
-- `public/index.html`, `public/style.css`: UI.
+- `public/engine.mjs`: primitives, GLB I/O and animation sampling.
+- `public/app.jsx`: React application entry point.
+- `public/editor-shell.html`: editor markup mounted by React.
+- `public/editor-controller.mjs`: editor history, controls and generation flow.
+- `public/renderer.mjs`: Three.js scene renderer.
+- `public/index.html`, `public/style.css`: Vite HTML entry and UI styles.
 - `public/assets/lilac-animated.glb`: starter model.
 - `checks.mjs`: automated verification.
 

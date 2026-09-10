@@ -828,7 +828,7 @@ function readGLBClips(gltf, nodes, readAccessor) {
 
 export function importGLB(buffer) {
   if (buffer.byteLength > LIMITS.upload) {
-    throw Error('Maximum file size is 16 MB.');
+    throw Error('Maximum file size is 50 MB.');
   }
 
   const {gltf, binary} = parseGLBChunks(buffer);

@@ -12,7 +12,13 @@ import {
   validateRecipe
 } from './public/contracts.mjs';
 
-const ROOT = path.resolve(fileURLToPath(new URL('./public/', import.meta.url)));
+const ROOT = path.resolve(
+  process.env.LILAC_STATIC_ROOT ||
+    fileURLToPath(new URL('./public/', import.meta.url))
+);
+const THREE_MODULE = path.resolve(
+  fileURLToPath(new URL('./node_modules/three/build/three.module.js', import.meta.url))
+);
 const sessions = new Map();
 const DEFAULT_MODEL = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
 const MAX_BODY_BYTES = 160000;
@@ -20,6 +26,7 @@ const GENERATION_TIMEOUT_MS = 85000;
 const SESSION_IDLE_MS = 8 * 60 * 60 * 1000;
 const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8',
   '.mjs': 'text/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
   '.glb': 'model/gltf-binary',
@@ -430,14 +437,21 @@ async function serveStatic(request, response, url) {
     throw createError(405, 'Method not allowed.');
   }
 
+  const isThreeModule = url.pathname === '/vendor/three.module.js';
   const relativePath =
     url.pathname === '/'
       ? 'index.html'
       : decodeURIComponent(url.pathname.slice(1));
-  const file = path.resolve(ROOT, relativePath);
+  const file = isThreeModule
+    ? THREE_MODULE
+    : path.resolve(ROOT, relativePath);
   const indexFile = path.join(ROOT, 'index.html');
 
-  if (!file.startsWith(`${ROOT}${path.sep}`) && file !== indexFile) {
+  if (
+    !isThreeModule &&
+    !file.startsWith(`${ROOT}${path.sep}`) &&
+    file !== indexFile
+  ) {
     throw createError(403, 'Forbidden path.');
   }
 

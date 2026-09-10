@@ -1,5 +1,4 @@
 import {
-  Renderer,
   exportGLB,
   fromRecipe,
   importGLB,
@@ -7,8 +6,10 @@ import {
   quat,
   euler
 } from './engine.mjs';
+import {Renderer} from './renderer.mjs';
 import {
   finite,
+  LIMITS,
   validateAnimation,
   validateRecipe
 } from './contracts.mjs';
@@ -22,6 +23,9 @@ const EDITABLE_CLIP_CONTROLS = [
   'duration',
   'loop'
 ];
+const MAX_PROJECT_GLB_LENGTH = Math.ceil((LIMITS.upload * 4) / 3);
+const MAX_PROJECT_FILE_BYTES = MAX_PROJECT_GLB_LENGTH + 1024 * 1024;
+const STARTER_URL = new URL('./assets/lilac-animated.glb', import.meta.url);
 
 let renderer;
 let doc;
@@ -317,7 +321,7 @@ function download(data, name, type) {
 }
 
 async function starter() {
-  const response = await fetch('/assets/lilac-animated.glb');
+  const response = await fetch(STARTER_URL);
   if (!response.ok) {
     throw Error('Starter asset could not be loaded.');
   }
@@ -479,7 +483,7 @@ async function importFile() {
     if (file.name.endsWith('.glb')) {
       documentData = importGLB(await file.arrayBuffer());
     } else if (file.name.endsWith('.json')) {
-      if (file.size > 24 * 1024 * 1024) {
+      if (file.size > MAX_PROJECT_FILE_BYTES) {
         throw Error('Project file too large.');
       }
 
@@ -488,7 +492,7 @@ async function importFile() {
         project.format !== 'lilac-project' ||
         project.version !== 1 ||
         typeof project.glb !== 'string' ||
-        project.glb.length > 23 * 1024 * 1024
+        project.glb.length > MAX_PROJECT_GLB_LENGTH
       ) {
         throw Error('Not a supported Lilac project.');
       }
